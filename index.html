@@ -7,6 +7,13 @@
         body {
             font-family: Arial, sans-serif;
         }
+        .hidden {
+            display: none;
+        }
+        .center {
+            text-align: center;
+            margin-top: 20%;
+        }
         .word-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -27,7 +34,6 @@
             text-align: center;
             justify-content: center;
             box-sizing: border-box;
-            user-select: none;
         }
         .word-item:hover, .highlight, .selected {
             background-color: yellow;
@@ -77,47 +83,68 @@
             text-align: center;
             margin-left: 10px;
         }
-        #contextMenu {
-            display: none;
+        .context-menu {
             position: absolute;
-            z-index: 1000;
+            display: none;
             background-color: white;
             border: 1px solid #ccc;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
         }
-        #contextMenu ul {
+        .context-menu ul {
             list-style: none;
-            margin: 0;
             padding: 5px 0;
+            margin: 0;
         }
-        #contextMenu ul li {
+        .context-menu ul li {
             padding: 8px 12px;
             cursor: pointer;
         }
-        #contextMenu ul li:hover {
+        .context-menu ul li:hover {
             background-color: #eee;
         }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <label for="repeatCount">Repeat Count:</label>
-        <input type="number" id="repeatCount" min="1" value="1">
-        <button onclick="startReading()">Start Reading</button>
-        <button onclick="stopReading()">Stop Reading</button>
+    <div id="passwordScreen" class="center">
+        <h2>Enter Password to Access</h2>
+        <input type="password" id="passwordInput" placeholder="Enter Password">
+        <button onclick="checkPassword()">Submit</button>
+        <p id="passwordError" style="color: red; display: none;">Incorrect password. Please try again.</p>
     </div>
-    <div class="word-container" id="wordContainer">
-        <!-- Words will be inserted here -->
-    </div>
-    <div class="pagination" id="pagination">
-        <!-- Pagination buttons will be inserted here -->
-    </div>
-    <div id="contextMenu">
-        <ul>
-            <li onclick="translateWord('google')">Google翻译</li>
-        </ul>
+    <div id="mainContent" class="hidden">
+        <div class="controls">
+            <label for="repeatCount">Repeat Count:</label>
+            <input type="number" id="repeatCount" min="1" value="1">
+            <button onclick="startReading()">Start Reading</button>
+            <button onclick="stopReading()">Stop Reading</button>
+        </div>
+        <div class="word-container" id="wordContainer">
+            <!-- Words will be inserted here -->
+        </div>
+        <div class="pagination" id="pagination">
+            <!-- Pagination buttons will be inserted here -->
+        </div>
+        <div class="context-menu" id="contextMenu">
+            <ul>
+                <li onclick="googleTranslate()">Google翻译</li>
+                <li onclick="modifyTranslation()">修改翻译</li>
+            </ul>
+        </div>
     </div>
     <script>
+        const password = "Hacker517180179";
+
+        function checkPassword() {
+            const input = document.getElementById('passwordInput').value;
+            if (input === password) {
+                document.getElementById('passwordScreen').classList.add('hidden');
+                document.getElementById('mainContent').classList.remove('hidden');
+            } else {
+                document.getElementById('passwordError').style.display = 'block';
+            }
+        }
+
         const wordsPerPage = 100;
         const pagesToShow = 10;
         let currentPage = 1;
@@ -127,7 +154,6 @@
         let repeatCount = 1;
         let repeatCounter = 0;
         let selectedWordIndex = null;
-        let selectedWord = '';
 
         function displayPage(page) {
             const start = (page - 1) * wordsPerPage;
@@ -139,6 +165,11 @@
             paginatedWords.forEach((wordInfo, index) => {
                 const wordItem = document.createElement('div');
                 wordItem.className = 'word-item';
+                wordItem.oncontextmenu = (event) => {
+                    event.preventDefault();
+                    selectedWordIndex = index;
+                    showContextMenu(event.pageX, event.pageY);
+                };
                 wordItem.onclick = () => {
                     const audio = new Audio(wordInfo.audioPath);
                     audio.play();
@@ -147,10 +178,6 @@
                     }
                     wordItem.classList.add('selected');
                     selectedWordIndex = index;
-                };
-                wordItem.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    showContextMenu(e, wordInfo.word);
                 };
 
                 const wordText = document.createElement('div');
@@ -272,35 +299,33 @@
             currentWordIndex = 0;
         }
 
-        function showContextMenu(event, word) {
-            selectedWord = word;
+        function showContextMenu(x, y) {
             const contextMenu = document.getElementById('contextMenu');
+            contextMenu.style.left = `${x}px`;
+            contextMenu.style.top = `${y}px`;
             contextMenu.style.display = 'block';
-            contextMenu.style.left = `${event.pageX}px`;
-            contextMenu.style.top = `${event.pageY}px`;
+            document.addEventListener('click', hideContextMenu);
         }
 
         function hideContextMenu() {
             const contextMenu = document.getElementById('contextMenu');
             contextMenu.style.display = 'none';
+            document.removeEventListener('click', hideContextMenu);
         }
 
-        function translateWord(service) {
-            let url = '';
-            switch (service) {
-                case 'google':
-                                        url = `https://translate.google.com/?sl=en&tl=zh-CN&text=${selectedWord}&op=translate`;
-                    break;
-            }
-            window.open(url, '_blank');
-            hideContextMenu();
+        function googleTranslate() {
+            const word = wordsList[(currentPage - 1) * wordsPerPage + selectedWordIndex].word;
+            window.open(`https://translate.google.com/?sl=en&tl=zh-CN&text=${word}&op=translate`, '_blank');
         }
 
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#contextMenu')) {
-                hideContextMenu();
+        function modifyTranslation() {
+            const wordInfo = wordsList[(currentPage - 1) * wordsPerPage + selectedWordIndex];
+            const newTranslation = prompt('修改翻译', wordInfo.translation);
+            if (newTranslation !== null && newTranslation !== '') {
+                wordInfo.translation = newTranslation;
+                displayPage(currentPage);
             }
-        });
+        }
 
         fetch('words_list.json')
             .then(response => response.json())
