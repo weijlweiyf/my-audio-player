@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .word-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 5px;
+            justify-items: center;
+            margin-bottom: 20px;
+        }
+        .word-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 80px;
+            height: 80px;
+            text-align: center;
+            justify-content: center;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        .word-item:hover, .highlight, .selected {
+            background-color: yellow;
+        }
+        .word-text {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .translation-text {
+            font-size: 14px;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin: 2px;
+        }
+        .pagination input {
+            width: 50px;
+            padding: 5px;
+            font-size: 14px;
+            text-align: center;
+            margin-left: 10px;
+        }
+        .pagination button.current-page {
+            background-color: #3E8E41;
+        }
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .controls input {
+            width: 50px;
+            padding: 5px;
+            font-size: 14px;
+            text-align: center;
+            margin-left: 10px;
+        }
+        #contextMenu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        #contextMenu ul {
+            list-style: none;
+            margin: 0;
+            padding: 5px 0;
+        }
+        #contextMenu ul li {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        #contextMenu ul li:hover {
+            background-color: #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label for="repeatCount">Repeat Count:</label>
+        <input type="number" id="repeatCount" min="1" value="1">
+        <button onclick="startReading()">Start Reading</button>
+        <button onclick="stopReading()">Stop Reading</button>
+    </div>
+    <div class="word-container" id="wordContainer">
+        <!-- Words will be inserted here -->
+    </div>
+    <div class="pagination" id="pagination">
+        <!-- Pagination buttons will be inserted here -->
+    </div>
+    <div id="contextMenu">
+        <ul>
+            <li onclick="translateWord('google')">Google翻译</li>
+        </ul>
+    </div>
+    <script>
+        const wordsPerPage = 100;
+        const pagesToShow = 10;
+        let currentPage = 1;
+        let wordsList = [];
+        let isReading = false;
+        let currentWordIndex = 0;
+        let repeatCount = 1;
+        let repeatCounter = 0;
+        let selectedWordIndex = null;
+        let selectedWord = '';
+
+        function displayPage(page) {
+            const start = (page - 1) * wordsPerPage;
+            const end = start + wordsPerPage;
+            const paginatedWords = wordsList.slice(start, end);
+
+            const wordContainer = document.getElementById('wordContainer');
+            wordContainer.innerHTML = '';
+            paginatedWords.forEach((wordInfo, index) => {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'word-item';
+                wordItem.onclick = () => {
+                    const audio = new Audio(wordInfo.audioPath);
+                    audio.play();
+                    if (selectedWordIndex !== null) {
+                        wordContainer.children[selectedWordIndex].classList.remove('selected');
+                    }
+                    wordItem.classList.add('selected');
+                    selectedWordIndex = index;
+                };
+                wordItem.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    showContextMenu(e, wordInfo.word);
+                };
+
+                const wordText = document.createElement('div');
+                wordText.className = 'word-text';
+                wordText.innerText = wordInfo.word;
+
+                const translationText = document.createElement('div');
+                translationText.className = 'translation-text';
+                translationText.innerText = wordInfo.translation;
+
+                wordItem.appendChild(wordText);
+                wordItem.appendChild(translationText);
+                wordContainer.appendChild(wordItem);
+            });
+
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            const totalPages = Math.ceil(wordsList.length / wordsPerPage);
+
+            const startPage = Math.max(1, page - Math.floor(pagesToShow / 2));
+            const endPage = Math.min(totalPages, startPage + pagesToShow - 1);
+
+            if (startPage > 1) {
+                const prevButton = document.createElement('button');
+                prevButton.innerText = '<上一页';
+                prevButton.onclick = () => {
+                    displayPage(currentPage - 1);
+                };
+                pagination.appendChild(prevButton);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.innerText = i;
+                pageButton.className = i === page ? 'current-page' : '';
+                pageButton.onclick = () => {
+                    currentPage = i;
+                    displayPage(currentPage);
+                };
+                pagination.appendChild(pageButton);
+            }
+
+            if (endPage < totalPages) {
+                const nextButton = document.createElement('button');
+                nextButton.innerText = '下一页>';
+                nextButton.onclick = () => {
+                    displayPage(currentPage + 1);
+                };
+                pagination.appendChild(nextButton);
+            }
+
+            const jumpInput = document.createElement('input');
+            jumpInput.type = 'number';
+            jumpInput.min = 1;
+            jumpInput.max = totalPages;
+            jumpInput.value = currentPage;
+
+            const jumpButton = document.createElement('button');
+            jumpButton.innerText = '跳转';
+            jumpButton.onclick = () => {
+                const pageNumber = parseInt(jumpInput.value);
+                if (pageNumber >= 1 && pageNumber <= totalPages) {
+                    currentPage = pageNumber;
+                    displayPage(currentPage);
+                }
+            };
+
+            pagination.appendChild(jumpInput);
+            pagination.appendChild(jumpButton);
+        }
+
+        function readWord() {
+            if (!isReading) return;
+
+            const wordContainer = document.getElementById('wordContainer');
+            const wordItems = wordContainer.getElementsByClassName('word-item');
+            const wordItem = wordItems[currentWordIndex];
+            const audioPath = wordsList[(currentPage - 1) * wordsPerPage + currentWordIndex].audioPath;
+
+            wordItem.classList.add('highlight');
+            const audio = new Audio(audioPath);
+            audio.play();
+
+            audio.onended = () => {
+                wordItem.classList.remove('highlight');
+                repeatCounter++;
+                if (repeatCounter < repeatCount) {
+                    readWord();
+                } else {
+                    repeatCounter = 0;
+                    currentWordIndex++;
+                    if (currentWordIndex >= wordsPerPage) {
+                        currentWordIndex = 0;
+                        currentPage++;
+                        if (currentPage > Math.ceil(wordsList.length / wordsPerPage)) {
+                            stopReading();
+                            return;
+                        }
+                        displayPage(currentPage);
+                    }
+                    readWord();
+                }
+            };
+        }
+
+        function startReading() {
+            repeatCount = parseInt(document.getElementById('repeatCount').value);
+            isReading = true;
+            if (selectedWordIndex !== null) {
+                currentWordIndex = selectedWordIndex;
+            } else {
+                currentWordIndex = 0;
+            }
+            readWord();
+        }
+
+        function stopReading() {
+            isReading = false;
+            currentWordIndex = 0;
+        }
+
+        function showContextMenu(event, word) {
+            selectedWord = word;
+            const contextMenu = document.getElementById('contextMenu');
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = `${event.pageX}px`;
+            contextMenu.style.top = `${event.pageY}px`;
+        }
+
+        function hideContextMenu() {
+            const contextMenu = document.getElementById('contextMenu');
+            contextMenu.style.display = 'none';
+        }
+
+        function translateWord(service) {
+            let url = '';
+            switch (service) {
+                case 'google':
+                                        url = `https://translate.google.com/?sl=en&tl=zh-CN&text=${selectedWord}&op=translate`;
+                    break;
+            }
+            window.open(url, '_blank');
+            hideContextMenu();
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#contextMenu')) {
+                hideContextMenu();
+            }
+        });
+
+        fetch('words_list.json')
+            .then(response => response.json())
+            .then(data => {
+                wordsList = data;
+                displayPage(currentPage);
+            })
+            .catch(error => console.error('Error loading words list:', error));
+    </script>
+</body>
+</html>
