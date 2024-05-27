@@ -128,7 +128,6 @@
         <div class="context-menu" id="contextMenu">
             <ul>
                 <li onclick="googleTranslate()">Google翻译</li>
-                <li onclick="modifyTranslation()">修改翻译</li>
             </ul>
         </div>
     </div>
@@ -316,15 +315,6 @@
         function googleTranslate() {
             const word = wordsList[(currentPage - 1) * wordsPerPage + selectedWordIndex].word;
             window.open(`https://translate.google.com/?sl=en&tl=zh-CN&text=${word}&op=translate`, '_blank');
-        }
-
-        function modifyTranslation() {
-            const wordInfo = wordsList[(currentPage - 1) * wordsPerPage + selectedWordIndex];
-            const newTranslation = prompt('修改翻译', wordInfo.translation);
-            if (newTranslation !== null && newTranslation !== '') {
-                wordInfo.translation = newTranslation;
-                displayPage(currentPage);
-            }
         }
 
         fetch('words_list.json')
